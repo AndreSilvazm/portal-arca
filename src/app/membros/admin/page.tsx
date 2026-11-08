@@ -57,12 +57,11 @@ function NewPoll({ onCreated }: { onCreated: () => void }) {
 }
 
 function Manage() {
-  const { polls, closePoll, releasePoll, deletePoll, accounts } = useStore()
+  const { polls, closePoll, releasePoll, deletePoll, assemblies } = useStore()
   const [error, setError] = useState('')
   const run = async (task: Promise<string | null>) => { setError((await task) ?? '') }
   const [busy, setBusy] = useState('')
-  const secretary = accounts.find(a => a.admin) ?? { name: 'Secretaria', role: 'Diretor de Secretaria' }
-  const pdf = async (p: Poll) => { setBusy(p.id); try { await generateResultPdf(p, secretary) } finally { setBusy('') } }
+  const pdf = async (p: Poll) => { setBusy(p.id); try { await generateResultPdf(p, assemblies) } finally { setBusy('') } }
   const [confirming, setConfirming] = useState('')
   if (!polls.length) return <p className="empty">Nenhuma votação criada ainda.</p>
   return <><div className="admin-list">{polls.map(p => {

@@ -1,4 +1,5 @@
 import type { Poll } from './store'
+import type { Assembly } from './shared'
 import { audienceLabel, formatSize, totalVotes, voteOptions } from './store'
 
 const NAVY: [number, number, number] = [8, 24, 105]
@@ -28,7 +29,21 @@ function outcome(poll: Poll) {
   return yes > no ? 'PAUTA APROVADA' : 'PAUTA REJEITADA'
 }
 
-export async function generateResultPdf(poll: Poll, secretary: { name: string; role: string }) {
+// Quem assina o resultado: a Presidência e a Secretaria.
+const SIGNATURES = [
+  { name: 'Carine Zanotto', role: 'Presidenta' },
+  { name: 'André Simão', role: 'Diretor de Secretaria' },
+]
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+// A votação acontece na assembleia: usa a assembleia mais próxima do encerramento (sem assembleia, a data do encerramento).
+function assemblyOf(poll: Poll, assemblies: Assembly[]) {
+  const end = new Date(poll.closedAt ?? poll.endsAt).getTime()
+  return [...assemblies].sort((a, b) => Math.abs(new Date(a.startsAt).getTime() - end) - Math.abs(new Date(b.startsAt).getTime() - end))[0]
+}
+
+export async function generateResultPdf(poll: Poll, assemblies: Assembly[]) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const left = 14
@@ -51,6 +66,8 @@ export async function generateResultPdf(poll: Poll, secretary: { name: string; r
   text(description, 9, { color: GREY, gap: 3 })
 
   const ended = poll.closedAt ? `Encerrada pela Secretaria em ${fullDate(poll.closedAt)}` : `Encerrada por prazo em ${fullDate(poll.endsAt)}`
+  const assembly = assemblyOf(poll, assemblies)
+  if (assembly) { label('Assembleia'); text(`${assembly.title} · ${fullDate(assembly.startsAt)}${assembly.place ? ` · ${assembly.place}` : ''}`, 9.5, { gap: 1 }) }
   label('Quem podia votar'); text(audienceLabel(poll), 9.5, { gap: 1 })
   label('Encerramento'); text(ended, 9.5, { gap: 1 })
   label('Participação'); text(`${totalVotes(poll)} ${totalVotes(poll) === 1 ? 'voto registrado' : 'votos registrados'} · votação secreta · maioria simples`, 9.5, { gap: 4 })
@@ -79,12 +96,16 @@ export async function generateResultPdf(poll: Poll, secretary: { name: string; r
     text(poll.documents.slice(0, 5).map(d => `• ${d.name} (${formatSize(d.size)})`).join('\n'), 8.5, { color: GREY })
   }
 
-  // Assinatura fixa na parte baixa da área branca do template
+  // Assinaturas fixas na parte baixa da área branca do template, lado a lado, com a data da assembleia
   const sigY = 212
-  doc.setDrawColor(...NAVY).setLineWidth(0.3).line(left, sigY, left + 85, sigY)
-  doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(...NAVY).text(secretary.name, left, sigY + 5)
-  doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...GREY).text(`${secretary.role} · Instituto Arcanimal`, left, sigY + 9.5)
-  doc.text('Data: ____ / ____ / ________', left, sigY + 15)
+  const signDate = shortDate(assembly?.startsAt ?? poll.closedAt ?? poll.endsAt)
+  SIGNATURES.forEach((person, i) => {
+    const x = left + i * 97
+    doc.setDrawColor(...NAVY).setLineWidth(0.3).line(x, sigY, x + 85, sigY)
+    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(...NAVY).text(person.name, x, sigY + 5)
+    doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...GREY).text(`${person.role} · Instituto Arcanimal`, x, sigY + 9.5)
+    doc.text(`Data: ${signDate}`, x, sigY + 15)
+  })
 
   doc.save(`resultado-votacao-${poll.id}.pdf`)
 }
