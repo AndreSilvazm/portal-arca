@@ -10,7 +10,9 @@ node scripts/criar-admin.mjs      # cria a conta da Secretaria no banco local
 npm run dev                       # http://localhost:3000/login
 ```
 
-Para passar ao Firestore/Storage, siga os passos abaixo e descomente `GOOGLE_APPLICATION_CREDENTIALS` no `.env.local`. Os dados do modo local **não são migrados** automaticamente.
+**Modo REST (sem conta de serviço):** com `FIREBASE_API_KEY` e `FIREBASE_PROJECT_ID` no `.env.local`, o servidor lê e grava no Firestore pela API REST com a chave web do projeto, sem arquivo de chave (veja `src/server/restdb.ts`). Exige que as regras do Firestore permitam o acesso e **não** usa o Storage: os anexos continuam em `.data/files`. O voto único continua garantido (um commit atômico que só cria a participação se ela ainda não existir). Para voltar ao banco em arquivo, use `USE_LOCAL_DB=true`.
+
+Para passar ao Firestore/Storage com conta de serviço, siga os passos abaixo e descomente `GOOGLE_APPLICATION_CREDENTIALS` no `.env.local`. Os dados do modo local **não são migrados** automaticamente.
 
 ---
 

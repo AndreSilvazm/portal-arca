@@ -28,6 +28,10 @@ export const POST = route(async (req, ctx) => {
 
     tx.set(participant, { votedAt: new Date().toISOString() })
     tx.update(pollRef.collection('tally').doc('counts'), { [optionKeys[index]]: increment(1), total: increment(1) })
+  }).catch(error => {
+    // Modo REST: dois votos simultâneos — o segundo falha ao criar a participação que já existe.
+    if ((error as { status?: number }).status === 409) throw new HttpError(409, 'Seu voto já foi registrado nesta votação.')
+    throw error
   })
   return NextResponse.json({ ok: true })
 })

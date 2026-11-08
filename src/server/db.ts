@@ -2,11 +2,22 @@ import { applicationDefault, cert, getApp, getApps, initializeApp } from 'fireba
 import { FieldValue, Firestore, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { localDb, localIncrement, localPutFile } from './localdb'
+import { restDb } from './restdb'
 
-// Sem credenciais do Firebase, o servidor usa um banco local em arquivo (.data/) — só para desenvolvimento.
-// Usa Firestore e Storage de verdade com: FIREBASE_SERVICE_ACCOUNT (JSON), GOOGLE_APPLICATION_CREDENTIALS (arquivo da
-// chave) ou USE_FIREBASE=true (credenciais do gcloud: `gcloud auth application-default login`, sem arquivo de chave).
-export const isLocal = () => !process.env.FIREBASE_SERVICE_ACCOUNT && !process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.USE_FIREBASE !== 'true'
+// Três modos, nesta ordem:
+//  - admin: FIREBASE_SERVICE_ACCOUNT (JSON), GOOGLE_APPLICATION_CREDENTIALS (arquivo da chave) ou USE_FIREBASE=true (gcloud).
+//    Usa Firestore e Storage de verdade.
+//  - rest: FIREBASE_API_KEY + FIREBASE_PROJECT_ID. Firestore pela API REST com a chave web, sem conta de serviço.
+//    Os arquivos anexados continuam em .data/files (o Storage exige plano pago).
+//  - local: nenhuma das anteriores (ou USE_LOCAL_DB=true). Banco em arquivo (.data/), só para desenvolvimento.
+type Mode = 'admin' | 'rest' | 'local'
+const mode = (): Mode =>
+  process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.USE_FIREBASE === 'true' ? 'admin'
+    : process.env.FIREBASE_API_KEY && process.env.FIREBASE_PROJECT_ID && process.env.USE_LOCAL_DB !== 'true' ? 'rest'
+    : 'local'
+
+// Os arquivos anexados ficam no disco local sempre que não houver Storage (modos rest e local).
+export const isLocal = () => mode() !== 'admin'
 
 function app() {
   if (getApps().length) return getApp()
@@ -18,10 +29,13 @@ function app() {
   })
 }
 
-export const db = (): Firestore => (isLocal() ? (localDb as unknown as Firestore) : getFirestore(app()))
+export const db = (): Firestore => {
+  const m = mode()
+  return m === 'admin' ? getFirestore(app()) : ((m === 'rest' ? restDb : localDb) as unknown as Firestore)
+}
 
-// Soma atômica em um campo (Firestore ou banco local).
-export const increment = (n: number) => (isLocal() ? (localIncrement(n) as unknown as FieldValue) : FieldValue.increment(n))
+// Soma atômica em um campo (Firestore, REST ou banco local).
+export const increment = (n: number) => (mode() === 'admin' ? FieldValue.increment(n) : (localIncrement(n) as unknown as FieldValue))
 
 export async function putFile(path: string, data: Buffer, contentType: string) {
   if (isLocal()) return localPutFile(path, data)
