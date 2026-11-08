@@ -1,0 +1,6 @@
+import Shell from '@/components/Shell'
+import { HeroPage, Label } from '@/components/ui'
+
+export default function Institute() {
+  return <Shell><HeroPage number="01" label="INSTITUTO" title={<>Ideias ganham força<br/>quando viram <em>sistema.</em></>} text="O Arcanimal desenvolve capacidades tecnológicas para instituições e comunidades que querem avançar."/><section className="split"><aside>NOSSA MISSÃO</aside><div><h2>Transformar conhecimento técnico em soluções que façam sentido para as pessoas.</h2><p>Somos um instituto brasileiro independente. Trabalhamos entre tecnologia, design, dados e desenvolvimento institucional para tornar organizações mais preparadas, transparentes e conectadas ao seu propósito.</p></div></section><section className="principles"><Label>COMO TRABALHAMOS</Label><div>{['Clareza antes da complexidade','Tecnologia a serviço das pessoas','Colaboração como método','Impacto de longo prazo'].map((x,i)=><article key={x}><span>0{i+1}</span><h3>{x}</h3></article>)}</div></section><section className="cream-band"><div><small>MISSÃO</small><h2>Ampliar capacidades por meio da tecnologia.</h2></div><div><small>VISÃO</small><h2>Instituições mais inteligentes, abertas e preparadas.</h2></div></section></Shell>
+}

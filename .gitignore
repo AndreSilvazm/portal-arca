@@ -1,0 +1,16 @@
+node_modules
+.next
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+
+# Chaves de conta de serviço (nunca versionar)
+*-firebase-adminsdk-*.json
+chave-servico.json
+serviceAccount*.json
+
+# Banco e arquivos do modo local
+.data/
+
+# Exportação original do Figma Make
+*.make
