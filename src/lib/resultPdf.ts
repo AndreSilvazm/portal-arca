@@ -1,5 +1,5 @@
 import type { Poll } from './store'
-import type { Assembly } from './shared'
+import { outcomeOf, type Assembly } from './shared'
 import { audienceLabel, formatSize, totalVotes, voteOptions } from './store'
 
 const NAVY: [number, number, number] = [8, 24, 105]
@@ -18,15 +18,6 @@ async function loadTemplate() {
     reader.onerror = reject
     reader.readAsDataURL(blob)
   })
-}
-
-// Maioria simples: compara aprovações e rejeições; abstenções não decidem.
-function outcome(poll: Poll) {
-  const yes = poll.counts[voteOptions[0]] ?? 0
-  const no = poll.counts[voteOptions[1]] ?? 0
-  if (!totalVotes(poll)) return 'SEM VOTOS REGISTRADOS'
-  if (yes === no) return 'EMPATE'
-  return yes > no ? 'PAUTA APROVADA' : 'PAUTA REJEITADA'
 }
 
 // Quem assina o resultado: a Presidência e a Secretaria.
@@ -83,12 +74,12 @@ export async function generateResultPdf(poll: Poll, assemblies: Assembly[]) {
     doc.setFont('helvetica', 'bold').text(`${count}  ·  ${Math.round(pct)}%`, left + width - 40, y)
     doc.setFillColor(226, 230, 248).rect(left, y + 1.8, width - 45, 2.6, 'F')
     if (pct > 0) doc.setFillColor(...YELLOW).rect(left, y + 1.8, ((width - 45) * pct) / 100, 2.6, 'F')
-    y += 9.5
+    y += 8.5
   })
 
   y += 1
   doc.setFillColor(...NAVY).rect(left, y - 4.5, width, 9, 'F')
-  doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(255, 255, 255).text(`RESULTADO: ${outcome(poll)}`, left + 4, y + 1.4)
+  doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(255, 255, 255).text(`RESULTADO: ${(totalVotes(poll) ? outcomeOf(poll.counts) : 'SEM VOTOS REGISTRADOS')}`, left + 4, y + 1.4)
   y += 11
 
   if (poll.documents.length) {
@@ -97,7 +88,7 @@ export async function generateResultPdf(poll: Poll, assemblies: Assembly[]) {
   }
 
   // Assinaturas fixas na parte baixa da área branca do template, lado a lado, com a data da assembleia
-  const sigY = 212
+  const sigY = 213
   const signDate = shortDate(assembly?.startsAt ?? poll.closedAt ?? poll.endsAt)
   SIGNATURES.forEach((person, i) => {
     const x = left + i * 97
@@ -106,6 +97,12 @@ export async function generateResultPdf(poll: Poll, assemblies: Assembly[]) {
     doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...GREY).text(`${person.role} · Instituto Arcanimal`, x, sigY + 9.5)
     doc.text(`Data: ${signDate}`, x, sigY + 15)
   })
+
+  // Selo de integridade: hash SHA-256 do registro da votação, gravado no encerramento
+  if (poll.resultHash) {
+    doc.setFont('helvetica', 'bold').setFontSize(6.5).setTextColor(...GREY).text('HASH SHA-256 DO REGISTRO DA VOTAÇÃO', left, sigY + 20)
+    doc.setFont('courier', 'normal').setFontSize(6.2).setTextColor(...NAVY).text(poll.resultHash, left, sigY + 23.5)
+  }
 
   doc.save(`resultado-votacao-${poll.id}.pdf`)
 }

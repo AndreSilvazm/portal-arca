@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/server/db'
+import { sealPoll } from '@/server/seal'
 import { canSee, loadPermissions, publicUser, requireUser, route, User } from '@/server/session'
 import { Account, Assembly, folders, folderScreen, optionKeys, Poll, Post, postScreen, PostType, StateResponse, StoredDoc, voteOptions } from '@/lib/shared'
 
@@ -25,7 +26,7 @@ export const GET = route(async req => {
     Promise.all((Object.keys(postScreen) as PostType[]).filter(t => see(postScreen[t])).map(t => list<Post>('posts', 'type', t))).then(r => r.flat()),
     Promise.all(folders.filter(f => see(folderScreen[f])).map(f => list<StoredDoc>('documents', 'folder', f))).then(r => r.flat()),
     see('Assembleias') ? list<Assembly>('assemblies') : Promise.resolve<Assembly[]>([]),
-    see('Votações') || see('Eleições e resultados') ? list<Omit<Poll, 'counts' | 'total' | 'voted'> & { closedAt: string | null; releasedAt: string | null; opensAt: string | null }>('polls') : Promise.resolve([]),
+    see('Votações') || see('Eleições e resultados') ? list<Omit<Poll, 'counts' | 'total' | 'voted'> & { closedAt: string | null; releasedAt: string | null; opensAt: string | null; resultHash?: string }>('polls') : Promise.resolve([]),
   ])
 
   // Votação não liberada é invisível para os membros; só a Secretaria a enxerga (agendada).
@@ -34,6 +35,11 @@ export const GET = route(async req => {
   const now = Date.now()
   const refs = visible.flatMap(p => [firestore.doc(`polls/${p.id}/tally/counts`), firestore.doc(`polls/${p.id}/participants/${user.id}`)])
   const docs = refs.length ? await firestore.getAll(...refs) : []
+
+  // Votação encerrada sem selo (por prazo ou anterior ao selo) é lacrada na primeira leitura.
+  await Promise.all(visible.map(async (p, i) => {
+    if (p.releasedAt && !p.resultHash && (p.closedAt || new Date(p.endsAt).getTime() <= now)) Object.assign(p, await sealPoll(p.id, p, docs[i * 2].data() ?? {}))
+  }))
 
   const polls: Poll[] = visible.map((p, i) => {
     const tally = docs[i * 2]

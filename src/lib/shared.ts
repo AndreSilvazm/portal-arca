@@ -24,6 +24,15 @@ export const folderScreen: Record<string, Screen> = { 'Atas de reunião': 'Docum
 
 export const voteOptions = ['Aprovo a pauta', 'Rejeito a pauta', 'Abstenção']
 // Chaves estáveis no banco para cada opção (os rótulos podem mudar de texto sem quebrar a apuração).
+// Maioria simples: compara aprovações e rejeições; abstenções não decidem.
+export function outcomeOf(counts: Record<string, number>) {
+  const yes = counts[voteOptions[0]] ?? 0
+  const no = counts[voteOptions[1]] ?? 0
+  if (!yes && !no && !(counts[voteOptions[2]] ?? 0)) return 'SEM VOTOS REGISTRADOS'
+  if (yes === no) return 'EMPATE'
+  return yes > no ? 'PAUTA APROVADA' : 'PAUTA REJEITADA'
+}
+
 export const optionKeys = ['aprovo', 'rejeito', 'abstencao']
 
 export const assemblyKinds = ['Assembleia Geral Ordinária', 'Assembleia Geral Extraordinária', 'Reunião de Diretoria', 'Reunião de Conselho Fiscal'] as const
@@ -47,6 +56,8 @@ export type Poll = {
   releasedAt?: string
   closedAt?: string
   createdAt: string
+  // Selo do resultado, gravado no encerramento: hash SHA-256 do registro da votação (sai no PDF).
+  resultHash?: string
   // Apuração: o servidor só envia depois do encerramento. `total` (participação) também vai para a Secretaria.
   counts: Record<string, number>
   total: number
